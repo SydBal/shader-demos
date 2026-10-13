@@ -53,13 +53,6 @@
   header.site .lede code, .how code { color: var(--purple); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; }
 
   .controls { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin: 1.6rem 0 0.4rem; }
-  .controls .tab {
-    background: var(--panel); color: var(--ink);
-    border: 1px solid var(--border); padding: 0.5rem 1.1rem;
-    font-size: 0.95rem; cursor: pointer;
-  }
-  .controls .tab[aria-pressed="true"] { background: var(--purple-deep); border-color: var(--purple-deep); color: #fff; }
-  .controls .spacer { flex: 1; }
   .controls .pause {
     background: transparent; color: var(--muted);
     border: 1px solid var(--border); padding: 0.5rem 1.1rem;
@@ -106,20 +99,20 @@
   body.og .demo > p, body.og .source-wrap, body.og .arrow { display: none; }
   body.og .demo { border: none; background: transparent; margin: 0; padding: 0; }
   body.og .demo h2 { display: none; }
-  body.og .og-title { display: block; padding: 34px 48px 0; }
-  body.og .og-title .k { color: var(--purple); font-weight: 800; font-size: 20px; letter-spacing: 4px; text-transform: uppercase; }
-  body.og .og-title h1 { margin: 6px 0 0; font-size: 64px; letter-spacing: -1px; }
+  body.og .og-title { display: block; padding: 28px 48px 0; }
+  body.og .og-title .k { color: var(--purple); font-weight: 800; font-size: 18px; letter-spacing: 4px; text-transform: uppercase; }
+  body.og .og-title h1 { margin: 4px 0 0; font-size: 54px; letter-spacing: -1px; }
   body.og .og-title h1 span { color: var(--purple); }
-  body.og .og-title .sub { color: var(--muted); font-size: 22px; margin-top: 2px; }
-  body.og .demos { display: flex; gap: 24px; padding: 26px 48px 0; }
+  body.og .og-title .sub { color: var(--muted); font-size: 20px; margin-top: 2px; }
+  body.og .demos { display: flex; gap: 24px; padding: 18px 48px 84px; align-items: flex-start; }
   body.og .demo { flex: 1 1 0; }
-  body.og .stage { display: block; }
+  body.og .stage { display: block; text-align: center; }
   body.og .result-box { flex: none; }
-  body.og canvas.shader { width: 100%; }
+  body.og canvas.shader { width: auto; max-width: 100%; max-height: 300px; margin: 0 auto; }
   body.og .og-foot { position: fixed; bottom: 26px; left: 48px; right: 48px; display: flex; justify-content: space-between; color: var(--muted); font-size: 20px; }
   body.og .og-foot .dom { color: var(--purple); font-family: ui-monospace, Menlo, monospace; }
   @media (prefers-reduced-motion: reduce) {
-    .controls .tab, .controls .pause { transition: none; }
+    .controls .pause { transition: none; }
   }
 </style>
 </head>
@@ -132,14 +125,10 @@
     <h1>Shader Demos: Fire &amp; Drip</h1>
     <p class="lede">Week 1. Two fragment shaders that run on <strong>any DOM element</strong>.
       The element is rasterized to a texture with <code>SVG foreignObject</code>, then a fullscreen
-      triangle does the rest. Pick a source element below and watch both shaders chew on it.</p>
+      triangle does the rest. Fire gets the word FRAG; drip gets an orb.</p>
   </header>
 
-  <div class="controls" role="group" aria-label="Source element presets">
-    <button class="tab" data-preset="orb" aria-pressed="true">Orb</button>
-    <button class="tab" data-preset="word" aria-pressed="false">Word</button>
-    <button class="tab" data-preset="button" aria-pressed="false">Button</button>
-    <span class="spacer"></span>
+  <div class="controls" role="group" aria-label="Animation controls">
     <button class="pause" id="pauseBtn" aria-pressed="false">Pause motion</button>
   </div>
   <p class="motion-note" id="motionNote"></p>
@@ -153,9 +142,8 @@
   <main class="demos">
     <section class="demo" aria-labelledby="fire-h">
       <h2 id="fire-h">&#128293; Fire <span class="tag">fragment shader</span></h2>
-      <p>Layered value noise scrolls upward, domain-warped for turbulence, then pushed through a
-        black &rarr; red &rarr; orange &rarr; pale-yellow ramp. The element itself burns from the base up;
-        flames lick above it with a flicker term, and sparks rise through the hot zone.</p>
+      <p>Layered noise scrolls upward through a black &rarr; red &rarr; orange &rarr; pale-yellow ramp.
+        Flame columns rise from the letters themselves, the type ignites from the base up, and embers drift skyward.</p>
       <div class="stage">
         <div class="pane source-wrap">
           <span class="label">Source element (plain DOM)</span>
@@ -171,9 +159,8 @@
 
     <section class="demo" aria-labelledby="drip-h">
       <h2 id="drip-h">&#128167; Drip <span class="tag">fragment shader</span></h2>
-      <p>A traveling melt wave pulls pixels downward, anchored at the top edge so the element sags
-        instead of sliding. Four looping droplets form necks at the bottom edge, detach, accelerate
-        downward, and fade &mdash; each tinted with the element&rsquo;s own average color.</p>
+      <p>Slow and viscous. The orb sags under its own weight, thick strands swell and recede,
+        and glossy droplets form necks, detach, and fall &mdash; tinted with the orb&rsquo;s own color.</p>
       <div class="stage">
         <div class="pane source-wrap">
           <span class="label">Source element (plain DOM)</span>
@@ -299,12 +286,13 @@ void main() {
   float depth = clamp((tip - uv.y) / 0.55, 0.0, 1.0);   // 0 at tip, 1 deep
   float body = smoothstep(0.0, 0.10, depth);            // soft tip edge
 
-  // Flame columns rise from the element itself: look straight down
-  // for element alpha, so a small centered element gets a column
-  // of flame instead of a full-width wall.
+  // Flame columns rise from the element: look down for element alpha,
+  // so a small centered element gets a column of flame, not a full-width wall.
   float colEl = 0.0;
-  for (float k = 0.0; k < 5.0; k++)
-    colEl = max(colEl, sampleElement(vec2(uv.x, uv.y - k * 0.10)).a);
+  colEl = max(colEl, sampleElement(vec2(uv.x, uv.y - 0.10)).a);
+  colEl = max(colEl, sampleElement(vec2(uv.x, uv.y - 0.20)).a);
+  colEl = max(colEl, sampleElement(vec2(uv.x, uv.y - 0.30)).a);
+  colEl = max(colEl, sampleElement(vec2(uv.x, uv.y - 0.40)).a);
   float colMask = smoothstep(0.0, 0.35, colEl);
   body *= colMask;
 
@@ -316,7 +304,7 @@ void main() {
   float elA = el.a;
 
   // Smolder: the element glows through, brightest at its base.
-  float hgt = (uv.y - u_y0) / max(u_y1 - u_y0, 1e-3);   // 0 at element bottom, 1 at top
+  float hgt = (uv.y - u_y0) / max(u_y1 - u_y0, 1e-3);
   float smolder = smoothstep(0.0, 0.05, elA) * (1.0 - hgt * 0.70) * (0.30 + 0.45 * f);
   vec3 flame = fireRamp(max(heat, smolder));
 
@@ -338,7 +326,7 @@ void main() {
   if (h > 0.94 && uv.y < tip && colMask > 0.01) {
     vec2 spos = vec2(hash(cell + 1.7), fract(hash(cell + 3.1) + t * (0.3 + h)));
     vec2 dxy = fr - spos;
-    dxy.x *= (u_res.x / u_res.y) * (12.0 / 28.0);   // round dots on screen
+    dxy.x *= (u_res.x / u_res.y) * (12.0 / 28.0);
     float spark = (1.0 - smoothstep(0.015, 0.09, length(dxy)))
                 * (1.0 - smoothstep(tip - 0.3, tip, uv.y));
     col += vec3(1.0, 0.55, 0.15) * spark;
@@ -356,55 +344,40 @@ void main() {
   float aspect = u_res.x / u_res.y;
   float B = u_y0;   // element bottom edge
 
-  // --- Droplet field: four looping droplets -----------------
-  float d = 0.0;    // downward pull of the melt, in uv units
+  float d = 0.0;    // downward pull, in uv units
   vec3 dropCol = vec3(0.0);
   float dropA = 0.0;
-  for (int i = 0; i < 4; i++) {
-    float fi = float(i);
-    float xi = 0.12 + 0.76 * hash(vec2(fi * 1.71 + 0.3, 3.1));
-    float spd = 0.20 + 0.16 * hash(vec2(fi * 2.13 + 1.7, 7.7));
-    float ph = fract(t * spd + hash(vec2(fi * 3.7, 9.3)) * 5.0);  // 0 -> 1 loop
 
-    // Neck: the column elongates to feed the droplet while it forms.
-    float neck = (1.0 - smoothstep(0.15, 0.55, ph)) * smoothstep(0.0, 0.12, ph);
-    float bumpW = exp(-pow((uv.x - xi) * aspect * 9.0, 2.0));
-    d += bumpW * 0.22 * neck;
-
-    // Droplet: forms, detaches, accelerates down, fades.
-    float dy = B - 0.015 - ph * ph * 0.55;
-    float r = 0.032 * sin(3.14159 * clamp(ph * 1.1, 0.0, 1.0));
-    float fade = 1.0 - smoothstep(0.75, 1.0, ph);
-    if (r > 0.0005 && fade > 0.0) {
-      vec2 dp = vec2((uv.x - xi) * aspect, uv.y - dy);
-      float dd = length(dp);
-      float m = (1.0 - smoothstep(r * 0.72, r, dd)) * fade;
-      if (m > 0.0) {
-        float shade = 0.55 + 0.45 * (1.0 - dd / max(r, 1e-4));
-        float spec = (1.0 - smoothstep(0.0, r * 0.35, length(dp - vec2(-r * 0.35, r * 0.35)))) * 0.9;
+  // slow viscous strands; the first three grow droplets
+  for (int j = 0; j < 5; j++) {
+    float fj = float(j);
+    float xc = 0.10 + 0.80 * hash(vec2(fj * 3.1 + 0.7, 12.3));
+    float swell = 0.5 + 0.5 * sin(t * (0.35 + 0.20 * hash(vec2(fj, 4.4))) + hash(vec2(fj, 5.5)) * 6.2831);
+    float w = exp(-pow((uv.x - xc) * aspect * 10.0, 2.0));
+    d += w * 0.30 * swell * swell;
+    if (j < 3) {
+      float ph = fract(t * (0.12 + 0.05 * hash(vec2(fj * 2.17, 7.7))) + hash(vec2(fj, 9.3)) * 5.0);
+      d += w * 0.22 * (1.0 - smoothstep(0.10, 0.45, ph)) * smoothstep(0.0, 0.08, ph);  // neck
+      float dy = B - 0.02 - ph * ph * 0.50;
+      float r = 0.045 * sin(3.14159 * clamp(ph * 1.05, 0.0, 1.0));
+      float fade = 1.0 - smoothstep(0.80, 1.0, ph);
+      if (r > 0.001 && fade > 0.0) {
+        vec2 dp = vec2((uv.x - xc) * aspect, uv.y - dy);
+        float dd = length(dp);
+        float m = (1.0 - smoothstep(r * 0.70, r, dd)) * fade;
+        float shade = 0.50 + 0.50 * (1.0 - dd / max(r, 1e-4));
+        float spec = (1.0 - smoothstep(0.0, r * 0.40, length(dp - vec2(-r * 0.35, r * 0.35)))) * 0.8;
         dropCol = mix(dropCol, u_avg * shade + vec3(spec), m);
         dropA = max(dropA, m);
       }
     }
   }
 
-  // --- Continuous melt: traveling wave pulls pixels down ----
-  float colN = fbm(vec2(uv.x * 7.0, 1.7));
-  float wob = sin(t * 0.9 + uv.x * 9.0 + colN * 6.2831)
-            * sin(t * 0.53 + uv.x * 5.0 + 1.7);
-  d += 0.02 + 0.10 * colN * colN * (0.6 + 0.4 * wob);
+  // gentle base sag, slowly morphing
+  d += 0.03 + 0.10 * fbm(vec2(uv.x * 5.0, 0.7 + t * 0.05));
 
-  // --- Drip columns: distinct rivulets that swell and recede ---
-  for (int j = 0; j < 6; j++) {
-    float fj = float(j);
-    float xc = 0.08 + 0.84 * hash(vec2(fj * 3.1 + 0.7, 12.3));
-    float phc = 0.5 + 0.5 * sin(t * (0.5 + 0.3 * hash(vec2(fj, 4.4))) + hash(vec2(fj, 5.5)) * 6.2831);
-    float cw = exp(-pow((uv.x - xc) * aspect * 14.0, 2.0));
-    d += cw * 0.26 * phc * phc;
-  }
-
-  // Sample pulled downward, anchored at the top edge.
-  float s = 1.0 - smoothstep(B + 0.10, 1.0, uv.y);   // 0 at top, 1 at/below bottom
+  // pull downward, anchored at the top edge
+  float s = 1.0 - smoothstep(B + 0.08, 1.0, uv.y);
   float sy = uv.y + d * s;
   vec2 euv = vec2(uv.x, (sy - B) / (1.0 - B));
   vec4 el = vec4(0.0);
@@ -412,28 +385,22 @@ void main() {
     el = texture2D(u_tex, vec2(euv.x, 1.0 - euv.y));
 
   vec3 col = mix(el.rgb, dropCol, dropA);
-  float alpha = max(el.a, dropA);
-  gl_FragColor = vec4(col, alpha);
+  gl_FragColor = vec4(col, max(el.a, dropA));
 }
 `;
 
-/* ---------------- presets: one HTML string, inline styles only ---------------- */
+/* ---------------- examples: one curated element per effect ---------------- */
 const FONT = "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;";
-const PRESETS = {
-  orb: {
-    w: 320, h: 320,
-    html: '<div xmlns="http://www.w3.org/1999/xhtml" style="width:320px;height:320px;display:flex;align-items:center;justify-content:center;">' +
-      '<div style="width:250px;height:250px;background:#7c3aed;border-radius:50%;"></div></div>'
-  },
-  word: {
+const EXAMPLES = {
+  fire: {
     w: 560, h: 220,
     html: '<div xmlns="http://www.w3.org/1999/xhtml" style="width:560px;height:220px;display:flex;align-items:center;justify-content:center;">' +
       '<span style="' + FONT + 'font-size:150px;font-weight:800;color:#8b5cf6;letter-spacing:-4px;">FRAG</span></div>'
   },
-  button: {
-    w: 560, h: 190,
-    html: '<div xmlns="http://www.w3.org/1999/xhtml" style="width:560px;height:190px;display:flex;align-items:center;justify-content:center;">' +
-      '<span style="' + FONT + 'display:inline-block;font-size:28px;font-weight:700;color:#ffffff;background:#7c3aed;padding:22px 52px;">Get started</span></div>'
+  drip: {
+    w: 320, h: 320,
+    html: '<div xmlns="http://www.w3.org/1999/xhtml" style="width:320px;height:320px;display:flex;align-items:center;justify-content:center;">' +
+      '<div style="width:250px;height:250px;background:#7c3aed;border-radius:50%;"></div></div>'
   }
 };
 
@@ -561,15 +528,8 @@ async function boot() {
   }
   document.getElementById('fireSrc').textContent = FRAG_FIRE.trim();
   document.getElementById('dripSrc').textContent = FRAG_DRIP.trim();
-  await setPreset(OG_MODE ? 'word' : currentPreset());
+  await setExamples();
 
-  document.querySelectorAll('.controls .tab').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.controls .tab').forEach(b => b.setAttribute('aria-pressed', 'false'));
-      btn.setAttribute('aria-pressed', 'true');
-      setPreset(btn.dataset.preset);
-    });
-  });
   document.getElementById('pauseBtn').addEventListener('click', togglePause);
 
   const note = document.getElementById('motionNote');
@@ -588,17 +548,15 @@ async function boot() {
   }
 }
 
-function currentPreset() {
-  const el = document.querySelector('.controls .tab[aria-pressed="true"]');
-  return el ? el.dataset.preset : 'orb';
-}
-
-async function setPreset(name) {
-  const p = PRESETS[name];
-  // Show the exact same HTML as live DOM next to the canvas.
-  document.getElementById('fireSource').innerHTML =
-    document.getElementById('dripSource').innerHTML = p.html;
-  await Promise.all([fire.setSource(p.html, p.w, p.h), drip.setSource(p.html, p.w, p.h)]);
+async function setExamples() {
+  const f = EXAMPLES.fire, d = EXAMPLES.drip;
+  // Show the exact same HTML as live DOM next to each canvas.
+  document.getElementById('fireSource').innerHTML = f.html;
+  document.getElementById('dripSource').innerHTML = d.html;
+  await Promise.all([
+    fire.setSource(f.html, f.w, f.h),
+    drip.setSource(d.html, d.w, d.h),
+  ]);
   if (paused) renderStill(currentT());
 }
 
