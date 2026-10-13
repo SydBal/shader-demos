@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shader Demos: Fire &amp; Drip - Dominic Balassone</title>
+<meta name="description" content="Week 1 of a Thursday shader series: two WebGL fragment shaders that run on any DOM element. Fire is layered noise scrolling upward through a black-red-orange-yellow ramp. Drip pulls pixels downward with a traveling melt wave and droplets that detach and fall.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://dominic.balass.one/shader-demos/">
+<meta property="og:title" content="Shader Demos: Fire &amp; Drip">
+<meta property="og:description" content="Two WebGL fragment shaders that run on any DOM element: one sets it on fire, one melts it. Rasterized via SVG foreignObject, 60fps, reduced-motion aware.">
+<meta property="og:image" content="https://dominic.balass.one/shader-demos/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Shader Demos: Fire &amp; Drip">
+<meta name="twitter:description" content="Two WebGL fragment shaders that run on any DOM element: one sets it on fire, one melts it. Rasterized via SVG foreignObject, 60fps, reduced-motion aware.">
+<meta name="twitter:image" content="https://dominic.balass.one/shader-demos/og-image.png">
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-C0DG17Z442"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-C0DG17Z442');
+</script>
+<style>
+  :root {
+    --bg: #0e0e13;
+    --panel: #16161d;
+    --ink: #f2f1f6;
+    --muted: #a7a7b3;
+    --purple: #8b5cf6;
+    --purple-deep: #7c3aed;
+    --border: #26262e;
+    --code-bg: #101016;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+  }
+  :focus-visible { outline: 3px solid var(--purple); outline-offset: 2px; }
+  a { color: var(--purple); font-weight: 600; }
+  .wrap { max-width: 1020px; margin: 0 auto; padding: 0 1.25rem; }
+  header.site { padding: 2.5rem 0 0.5rem; }
+  header.site .back { font-size: 0.9rem; }
+  header.site h1 { font-size: 2.2rem; margin: 0.6rem 0 0.2rem; letter-spacing: -0.5px; }
+  header.site .kicker { color: var(--purple); font-weight: 700; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 2px; }
+  header.site .lede { color: var(--muted); max-width: 62ch; }
+  header.site .lede code, .how code { color: var(--purple); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin: 1.6rem 0 0.4rem; }
+  .controls .tab {
+    background: var(--panel); color: var(--ink);
+    border: 1px solid var(--border); padding: 0.5rem 1.1rem;
+    font-size: 0.95rem; cursor: pointer;
+  }
+  .controls .tab[aria-pressed="true"] { background: var(--purple-deep); border-color: var(--purple-deep); color: #fff; }
+  .controls .spacer { flex: 1; }
+  .controls .pause {
+    background: transparent; color: var(--muted);
+    border: 1px solid var(--border); padding: 0.5rem 1.1rem;
+    font-size: 0.95rem; cursor: pointer;
+  }
+  .motion-note { color: var(--muted); font-size: 0.85rem; margin: 0.4rem 0 0; min-height: 1.4em; }
+
+  .demo { background: var(--panel); border: 1px solid var(--border); margin: 1.6rem 0; padding: 1.4rem; }
+  .demo h2 { margin: 0 0 0.3rem; font-size: 1.5rem; }
+  .demo h2 .tag { font-size: 0.8rem; color: var(--purple); font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin-left: 0.6rem; vertical-align: middle; }
+  .demo > p { color: var(--muted); margin: 0 0 1.2rem; max-width: 70ch; }
+  .stage { display: flex; gap: 1.4rem; align-items: center; flex-wrap: wrap; }
+  .pane { min-width: 0; }
+  .pane .label { display: block; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin-bottom: 0.5rem; }
+  .source-box { border: 1px dashed var(--border); padding: 1rem; display: inline-block; max-width: 100%; overflow: hidden; }
+  .arrow { font-size: 1.8rem; color: var(--purple); }
+  .result-box { flex: 1 1 420px; }
+  canvas.shader { display: block; width: 100%; height: auto; background: transparent; }
+  .gl-fallback { color: var(--muted); border: 1px solid var(--border); padding: 1rem; }
+
+  .how { margin: 2.4rem 0; }
+  .how h2 { font-size: 1.4rem; }
+  .how ol { color: var(--muted); max-width: 70ch; }
+  .how ol li { margin-bottom: 0.7rem; }
+  .how ol li strong { color: var(--ink); font-weight: 600; }
+  details.shader-src { background: var(--code-bg); border: 1px solid var(--border); margin: 1rem 0; }
+  details.shader-src summary { cursor: pointer; padding: 0.8rem 1rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--purple); font-size: 0.95rem; }
+  details.shader-src pre { margin: 0; padding: 0 1rem 1rem; overflow-x: auto; color: #d7d5e3; font-size: 0.82rem; line-height: 1.55; }
+
+  .series { margin: 2.4rem 0; }
+  .series h2 { font-size: 1.4rem; }
+  .series ul { list-style: none; padding: 0; }
+  .series li { padding: 0.5rem 0; border-bottom: 1px solid var(--border); color: var(--muted); }
+  .series li strong { color: var(--ink); }
+  footer.site { border-top: 1px solid var(--border); margin-top: 3rem; padding: 1.4rem 0 2.4rem; color: var(--muted); font-size: 0.9rem; }
+
+  /* OG capture mode: ?og renders a flat 1200x630 card of the two live shaders */
+  .og-title { display: none; }
+  .og-foot { display: none; }
+  body.og { overflow: hidden; }
+  body.og .wrap { max-width: none; padding: 0; }
+  body.og header.site, body.og .controls, body.og .motion-note,
+  body.og .how, body.og .series, body.og footer.site,
+  body.og .demo > p, body.og .source-wrap, body.og .arrow { display: none; }
+  body.og .demo { border: none; background: transparent; margin: 0; padding: 0; }
+  body.og .demo h2 { display: none; }
+  body.og .og-title { display: block; padding: 34px 48px 0; }
+  body.og .og-title .k { color: var(--purple); font-weight: 800; font-size: 20px; letter-spacing: 4px; text-transform: uppercase; }
+  body.og .og-title h1 { margin: 6px 0 0; font-size: 64px; letter-spacing: -1px; }
+  body.og .og-title h1 span { color: var(--purple); }
+  body.og .og-title .sub { color: var(--muted); font-size: 22px; margin-top: 2px; }
+  body.og .demos { display: flex; gap: 24px; padding: 26px 48px 0; }
+  body.og .demo { flex: 1 1 0; }
+  body.og .stage { display: block; }
+  body.og .result-box { flex: none; }
+  body.og canvas.shader { width: 100%; }
+  body.og .og-foot { position: fixed; bottom: 26px; left: 48px; right: 48px; display: flex; justify-content: space-between; color: var(--muted); font-size: 20px; }
+  body.og .og-foot .dom { color: var(--purple); font-family: ui-monospace, Menlo, monospace; }
+  @media (prefers-reduced-motion: reduce) {
+    .controls .tab, .controls .pause { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="site">
+    <a class="back" href="https://dominic.balass.one/">&larr; dominic.balass.one</a>
+    <p class="kicker">Thursday shader series</p>
+    <h1>Shader Demos: Fire &amp; Drip</h1>
+    <p class="lede">Week 1. Two fragment shaders that run on <strong>any DOM element</strong>.
+      The element is rasterized to a texture with <code>SVG foreignObject</code>, then a fullscreen
+      triangle does the rest. Pick a source element below and watch both shaders chew on it.</p>
+  </header>
+
+  <div class="controls" role="group" aria-label="Source element presets">
+    <button class="tab" data-preset="headline" aria-pressed="true">Headline</button>
+    <button class="tab" data-preset="button" aria-pressed="false">Button</button>
+    <button class="tab" data-preset="card" aria-pressed="false">Card</button>
+    <span class="spacer"></span>
+    <button class="pause" id="pauseBtn" aria-pressed="false">Pause motion</button>
+  </div>
+  <p class="motion-note" id="motionNote"></p>
+
+  <div class="og-title" aria-hidden="true">
+    <div class="k">Thursday shader series &middot; Week 1</div>
+    <h1>Fire <span>&amp;</span> Drip</h1>
+    <div class="sub">Two fragment shaders that run on any DOM element</div>
+  </div>
+
+  <main class="demos">
+    <section class="demo" aria-labelledby="fire-h">
+      <h2 id="fire-h">&#128293; Fire <span class="tag">fragment shader</span></h2>
+      <p>Layered value noise scrolls upward, domain-warped for turbulence, then pushed through a
+        black &rarr; red &rarr; orange &rarr; pale-yellow ramp. The element itself burns from the base up;
+        flames lick above it with a flicker term, and sparks rise through the hot zone.</p>
+      <div class="stage">
+        <div class="pane source-wrap">
+          <span class="label">Source element (plain DOM)</span>
+          <div class="source-box" id="fireSource"></div>
+        </div>
+        <div class="arrow" aria-hidden="true">&rarr;</div>
+        <div class="pane result-box">
+          <span class="label">fire.frag &middot; live WebGL</span>
+          <canvas class="shader" id="fireCanvas"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <section class="demo" aria-labelledby="drip-h">
+      <h2 id="drip-h">&#128167; Drip <span class="tag">fragment shader</span></h2>
+      <p>A traveling melt wave pulls pixels downward, anchored at the top edge so the element sags
+        instead of sliding. Four looping droplets form necks at the bottom edge, detach, accelerate
+        downward, and fade &mdash; each tinted with the element&rsquo;s own average color.</p>
+      <div class="stage">
+        <div class="pane source-wrap">
+          <span class="label">Source element (plain DOM)</span>
+          <div class="source-box" id="dripSource"></div>
+        </div>
+        <div class="arrow" aria-hidden="true">&rarr;</div>
+        <div class="pane result-box">
+          <span class="label">drip.frag &middot; live WebGL</span>
+          <canvas class="shader" id="dripCanvas"></canvas>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <section class="how" aria-labelledby="how-h">
+    <h2 id="how-h">How it works</h2>
+    <ol>
+      <li><strong>Rasterize.</strong> The source element&rsquo;s HTML (inline styles only, so it survives
+        serialization) goes into an <code>SVG foreignObject</code>, drawn to a 2D canvas at 2x. That canvas
+        becomes the WebGL texture. No screenshots, no html2canvas.</li>
+      <li><strong>Shade.</strong> A single fullscreen triangle runs the fragment shader. Uniforms are just
+        the element texture, time, resolution, the element&rsquo;s rectangle, and its average color.
+        Fire scrolls noise upward; drip displaces the sample coordinate downward.</li>
+      <li><strong>Respect motion.</strong> If <code>prefers-reduced-motion</code> is set, time freezes and
+        one composed frame renders. The pause button does the same on demand.</li>
+    </ol>
+    <details class="shader-src">
+      <summary>fire.frag</summary>
+      <pre id="fireSrc"></pre>
+    </details>
+    <details class="shader-src">
+      <summary>drip.frag</summary>
+      <pre id="dripSrc"></pre>
+    </details>
+  </section>
+
+  <section class="series" aria-labelledby="series-h">
+    <h2 id="series-h">In this series</h2>
+    <ul>
+      <li><strong>Week 1 &mdash; Fire &amp; Drip</strong> &middot; shaders on any DOM element (this page)</li>
+    </ul>
+  </section>
+
+  <div class="og-foot" aria-hidden="true">
+    <span class="dom">dominic.balass.one/shader-demos</span><span>WebGL &middot; GLSL</span>
+  </div>
+
+  <footer class="site">
+    <div>Week 1 &middot; October 2026 &middot; a Thursday shader series by Dominic Balassone</div>
+  </footer>
+</div>
+<script>
+'use strict';
+/* ============================================================
+   Week 1: two fragment shaders that run on any DOM element.
+   Pipeline: element HTML -> SVG foreignObject -> 2D canvas
+   -> WebGL texture -> fullscreen triangle + fragment shader.
+   ============================================================ */
+
+const VERT = `
+attribute vec2 a_pos;
+varying vec2 v_uv;
+void main() {
+  v_uv = a_pos * 0.5 + 0.5;
+  gl_Position = vec4(a_pos, 0.0, 1.0);
+}
+`;
+
+const COMMON = `
+precision mediump float;
+uniform sampler2D u_tex;   // rasterized element
+uniform vec2  u_res;       // canvas pixels
+uniform float u_time;      // seconds
+uniform float u_y0;        // element bottom, uv y-up
+uniform float u_y1;        // element top,    uv y-up
+uniform vec3  u_avg;       // element average opaque color
+varying vec2 v_uv;
+
+float hash(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+float vnoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
+             mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+float fbm(vec2 p) {
+  float v = 0.0, a = 0.5;
+  for (int i = 0; i < 4; i++) { v += a * vnoise(p); p = p * 2.03 + 11.7; a *= 0.5; }
+  return v;
+}
+// Sample the element texture. Returns transparent outside the element rect.
+vec4 sampleElement(vec2 uv) {
+  vec2 euv = vec2(uv.x, (uv.y - u_y0) / (u_y1 - u_y0));
+  if (euv.x < 0.0 || euv.x > 1.0 || euv.y < 0.0 || euv.y > 1.0) return vec4(0.0);
+  return texture2D(u_tex, vec2(euv.x, 1.0 - euv.y));
+}
+`;
+
+const FRAG_FIRE = `
+vec3 fireRamp(float t) {
+  t = clamp(t, 0.0, 1.0);
+  vec3 c = mix(vec3(0.30, 0.02, 0.00), vec3(0.90, 0.20, 0.01), smoothstep(0.00, 0.38, t));
+  c = mix(c, vec3(1.00, 0.62, 0.08), smoothstep(0.38, 0.70, t));
+  c = mix(c, vec3(1.00, 0.95, 0.75), smoothstep(0.70, 1.00, t));
+  return c;
+}
+
+void main() {
+  vec2 uv = v_uv;
+  float t = u_time;
+
+  // Rising, domain-warped turbulence: roiling base, wispy tips.
+  vec2 p = vec2(uv.x * 6.0, uv.y * 4.5 - t * 1.7);
+  float q = fbm(p + vec2(0.0, -t * 0.6));
+  float f = fbm(p + q * 1.6 + vec2(3.1, -t * 1.1));
+
+  // Flame silhouette: ridged noise makes sharp licking tongues.
+  float tipN = fbm(vec2(uv.x * 7.0 + 7.3, t * 0.9));
+  float ridge = pow(1.0 - abs(2.0 * tipN - 1.0), 1.5);
+  float tip = u_y1 + 0.02 + ridge * 0.50;
+  float depth = clamp((tip - uv.y) / 0.55, 0.0, 1.0);   // 0 at tip, 1 deep
+  float body = smoothstep(0.0, 0.10, depth);            // soft tip edge
+
+  float detail = fbm(vec2(uv.x * 16.0, uv.y * 11.0 - t * 3.2));
+  float heat = clamp(depth * (0.5 + f) * (0.6 + 0.8 * detail), 0.0, 1.0);
+  heat *= 0.85 + 0.15 * sin(t * 12.0 + uv.x * 22.0 + f * 4.0);  // flicker
+
+  vec4 el = sampleElement(uv);
+  float elA = el.a;
+
+  // Smolder: the element glows through, brightest at its base.
+  float hgt = (uv.y - u_y0) / max(u_y1 - u_y0, 1e-3);   // 0 at element bottom, 1 at top
+  float smolder = smoothstep(0.0, 0.05, elA) * (1.0 - hgt * 0.70) * (0.30 + 0.45 * f);
+  vec3 flame = fireRamp(max(heat, smolder));
+
+  // Burn the element itself; edges erode where the burn is fierce.
+  float burn = clamp(max(heat, smolder) * 1.35 - 0.18, 0.0, 1.0) * smoothstep(0.0, 0.04, elA);
+  vec3 col = mix(el.rgb, flame, burn);
+  float erode = fbm(vec2(uv.x * 18.0, uv.y * 14.0 - t * 2.4));
+  float alpha = elA * (1.0 - burn * 0.45 * erode);
+
+  // Halo of flame around and above the element.
+  float halo = body * (1.0 - smoothstep(0.0, 0.30, elA));
+  col = mix(col, flame, clamp(halo, 0.0, 1.0));
+  alpha = max(alpha, halo * body);
+
+  // Rising sparks through the hot zone.
+  vec2 sp = vec2(uv.x * 28.0, uv.y * 12.0 - t * 2.6);
+  vec2 cell = floor(sp), fr = fract(sp);
+  float h = hash(cell);
+  if (h > 0.94 && uv.y < tip) {
+    vec2 spos = vec2(hash(cell + 1.7), fract(hash(cell + 3.1) + t * (0.3 + h)));
+    vec2 dxy = fr - spos;
+    dxy.x *= (u_res.x / u_res.y) * (12.0 / 28.0);   // round dots on screen
+    float spark = (1.0 - smoothstep(0.015, 0.09, length(dxy)))
+                * (1.0 - smoothstep(tip - 0.3, tip, uv.y));
+    col += vec3(1.0, 0.55, 0.15) * spark;
+    alpha = max(alpha, spark);
+  }
+
+  gl_FragColor = vec4(col, alpha);
+}
+`;
+
+const FRAG_DRIP = `
+void main() {
+  vec2 uv = v_uv;
+  float t = u_time;
+  float aspect = u_res.x / u_res.y;
+  float B = u_y0;   // element bottom edge
+
+  // --- Droplet field: four looping droplets -----------------
+  float d = 0.0;    // downward pull of the melt, in uv units
+  vec3 dropCol = vec3(0.0);
+  float dropA = 0.0;
+  for (int i = 0; i < 4; i++) {
+    float fi = float(i);
+    float xi = 0.12 + 0.76 * hash(vec2(fi * 1.71 + 0.3, 3.1));
+    float spd = 0.20 + 0.16 * hash(vec2(fi * 2.13 + 1.7, 7.7));
+    float ph = fract(t * spd + hash(vec2(fi * 3.7, 9.3)) * 5.0);  // 0 -> 1 loop
+
+    // Neck: the column elongates to feed the droplet while it forms.
+    float neck = (1.0 - smoothstep(0.15, 0.55, ph)) * smoothstep(0.0, 0.12, ph);
+    float bumpW = exp(-pow((uv.x - xi) * aspect * 9.0, 2.0));
+    d += bumpW * 0.22 * neck;
+
+    // Droplet: forms, detaches, accelerates down, fades.
+    float dy = B - 0.015 - ph * ph * 0.55;
+    float r = 0.032 * sin(3.14159 * clamp(ph * 1.1, 0.0, 1.0));
+    float fade = 1.0 - smoothstep(0.75, 1.0, ph);
+    if (r > 0.0005 && fade > 0.0) {
+      vec2 dp = vec2((uv.x - xi) * aspect, uv.y - dy);
+      float dd = length(dp);
+      float m = (1.0 - smoothstep(r * 0.72, r, dd)) * fade;
+      if (m > 0.0) {
+        float shade = 0.55 + 0.45 * (1.0 - dd / max(r, 1e-4));
+        float spec = (1.0 - smoothstep(0.0, r * 0.35, length(dp - vec2(-r * 0.35, r * 0.35)))) * 0.9;
+        dropCol = mix(dropCol, u_avg * shade + vec3(spec), m);
+        dropA = max(dropA, m);
+      }
+    }
+  }
+
+  // --- Continuous melt: traveling wave pulls pixels down ----
+  float colN = fbm(vec2(uv.x * 7.0, 1.7));
+  float wob = sin(t * 0.9 + uv.x * 9.0 + colN * 6.2831)
+            * sin(t * 0.53 + uv.x * 5.0 + 1.7);
+  d += 0.02 + 0.10 * colN * colN * (0.6 + 0.4 * wob);
+
+  // --- Drip columns: distinct rivulets that swell and recede ---
+  for (int j = 0; j < 6; j++) {
+    float fj = float(j);
+    float xc = 0.08 + 0.84 * hash(vec2(fj * 3.1 + 0.7, 12.3));
+    float phc = 0.5 + 0.5 * sin(t * (0.5 + 0.3 * hash(vec2(fj, 4.4))) + hash(vec2(fj, 5.5)) * 6.2831);
+    float cw = exp(-pow((uv.x - xc) * aspect * 14.0, 2.0));
+    d += cw * 0.26 * phc * phc;
+  }
+
+  // Sample pulled downward, anchored at the top edge.
+  float s = 1.0 - smoothstep(B + 0.10, 1.0, uv.y);   // 0 at top, 1 at/below bottom
+  float sy = uv.y + d * s;
+  vec2 euv = vec2(uv.x, (sy - B) / (1.0 - B));
+  vec4 el = vec4(0.0);
+  if (euv.x >= 0.0 && euv.x <= 1.0 && euv.y >= 0.0 && euv.y <= 1.0)
+    el = texture2D(u_tex, vec2(euv.x, 1.0 - euv.y));
+
+  vec3 col = mix(el.rgb, dropCol, dropA);
+  float alpha = max(el.a, dropA);
+  gl_FragColor = vec4(col, alpha);
+}
+`;
+
+/* ---------------- presets: one HTML string, inline styles only ---------------- */
+const FONT = "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;";
+const PRESETS = {
+  headline: {
+    w: 560, h: 150,
+    html: '<div xmlns="http://www.w3.org/1999/xhtml" style="width:560px;height:150px;display:flex;align-items:center;justify-content:center;background:#7c3aed;">' +
+      '<span style="' + FONT + 'font-size:62px;font-weight:800;color:#ffffff;letter-spacing:-1px;">Hello, shaders</span></div>'
+  },
+  button: {
+    w: 560, h: 190,
+    html: '<div xmlns="http://www.w3.org/1999/xhtml" style="width:560px;height:190px;display:flex;align-items:center;justify-content:center;">' +
+      '<span style="' + FONT + 'display:inline-block;font-size:28px;font-weight:700;color:#ffffff;background:#7c3aed;padding:22px 52px;">Get started</span></div>'
+  },
+  card: {
+    w: 430, h: 250,
+    html: '<div xmlns="http://www.w3.org/1999/xhtml" style="width:430px;height:250px;background:#17171e;border:1px solid #3a3a44;padding:30px;box-sizing:border-box;">' +
+      '<div style="' + FONT + 'font-size:27px;font-weight:700;color:#f2f1f6;margin-bottom:12px;">Project Apollo</div>' +
+      '<div style="' + FONT + 'font-size:16px;line-height:1.55;color:#a7a7b3;">A small card with a title and two lines of body copy, rendered first as plain DOM, then chewed on by a fragment shader.</div></div>'
+  }
+};
+
+/* ---------------- rasterize: element HTML -> canvas -> texture ---------------- */
+async function rasterize(html, w, h) {
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">' +
+    '<foreignObject x="0" y="0" width="' + w + '" height="' + h + '">' + html + '</foreignObject></svg>';
+  const img = new Image();
+  const ready = new Promise((res, rej) => {
+    img.onload = res;
+    img.onerror = () => rej(new Error('rasterize failed'));
+  });
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  await ready;
+  const scale = Math.min(2, 1400 / Math.max(w, h));
+  const c = document.createElement('canvas');
+  c.width = Math.max(2, Math.round(w * scale));
+  c.height = Math.max(2, Math.round(h * scale));
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  return c;
+}
+
+function averageColor(c) {
+  const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+  let r = 0, g = 0, b = 0, n = 0;
+  for (let i = 0; i < d.length; i += 16) {
+    if (d[i + 3] > 128) { r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; }
+  }
+  return n ? [r / n / 255, g / n / 255, b / n / 255] : [0.5, 0.5, 0.5];
+}
+
+/* ---------------- one shader demo ---------------- */
+function compile(gl, type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
+    throw new Error('shader compile: ' + gl.getShaderInfoLog(s));
+  return s;
+}
+
+class ShaderDemo {
+  // pads: extra canvas room as fractions of element height (fire wants sky, drip wants floor)
+  constructor(canvas, fragBody, pads) {
+    this.canvas = canvas;
+    const gl = canvas.getContext('webgl', { antialias: false, alpha: true, depth: false, stencil: false });
+    if (!gl) throw new Error('WebGL unavailable');
+    this.gl = gl;
+    const prog = gl.createProgram();
+    gl.attachShader(prog, compile(gl, gl.VERTEX_SHADER, VERT));
+    gl.attachShader(prog, compile(gl, gl.FRAGMENT_SHADER, COMMON + fragBody));
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS))
+      throw new Error('program link: ' + gl.getProgramInfoLog(prog));
+    gl.useProgram(prog);
+    this.prog = prog;
+    // One fullscreen triangle, no index buffer.
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(prog, 'a_pos');
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    this.u = {};
+    for (const n of ['u_tex', 'u_res', 'u_time', 'u_y0', 'u_y1', 'u_avg'])
+      this.u[n] = gl.getUniformLocation(prog, n);
+    gl.uniform1i(this.u.u_tex, 0);
+    this.pads = pads;
+    this.tex = null;
+  }
+  async setSource(html, w, h) {
+    const gl = this.gl;
+    const raster = await rasterize(html, w, h);
+    const avg = averageColor(raster);
+    if (!this.tex) this.tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, raster);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const cssW = Math.min(w, 640);
+    const total = 1 + this.pads.top + this.pads.bottom;
+    this.canvas.width = Math.round(cssW * dpr);
+    this.canvas.height = Math.round(cssW * (h / w) * total * dpr);
+    gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    gl.useProgram(this.prog);
+    gl.uniform2f(this.u.u_res, this.canvas.width, this.canvas.height);
+    gl.uniform1f(this.u.u_y0, this.pads.bottom / total);
+    gl.uniform1f(this.u.u_y1, (this.pads.bottom + 1) / total);
+    gl.uniform3f(this.u.u_avg, avg[0], avg[1], avg[2]);
+  }
+  draw(t) {
+    const gl = this.gl;
+    gl.useProgram(this.prog);
+    gl.uniform1f(this.u.u_time, t);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+}
+
+/* ---------------- wiring ---------------- */
+const OG_MODE = /[?&]og\b/.test(location.search);
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const STILL_T = 4.2;   // frozen pose when motion is off
+
+let fire, drip, rafId = 0, paused = false, startEpoch = 0;
+
+async function boot() {
+  const fireCanvas = document.getElementById('fireCanvas');
+  const dripCanvas = document.getElementById('dripCanvas');
+  try {
+    fire = new ShaderDemo(fireCanvas, FRAG_FIRE, { top: 0.55, bottom: 0.0 });
+    drip = new ShaderDemo(dripCanvas, FRAG_DRIP, { top: 0.0, bottom: 0.55 });
+  } catch (e) {
+    for (const c of [fireCanvas, dripCanvas]) {
+      const div = document.createElement('div');
+      div.className = 'gl-fallback';
+      div.textContent = 'WebGL is unavailable in this browser, so the shaders cannot run here.';
+      c.replaceWith(div);
+    }
+    return;
+  }
+  document.getElementById('fireSrc').textContent = FRAG_FIRE.trim();
+  document.getElementById('dripSrc').textContent = FRAG_DRIP.trim();
+  await setPreset(OG_MODE ? 'headline' : currentPreset());
+
+  document.querySelectorAll('.controls .tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.controls .tab').forEach(b => b.setAttribute('aria-pressed', 'false'));
+      btn.setAttribute('aria-pressed', 'true');
+      setPreset(btn.dataset.preset);
+    });
+  });
+  document.getElementById('pauseBtn').addEventListener('click', togglePause);
+
+  const note = document.getElementById('motionNote');
+  if (OG_MODE) {
+    document.body.classList.add('og');
+    renderStill(STILL_T);
+    document.body.classList.add('ready');
+  } else if (REDUCED) {
+    paused = true;
+    note.textContent = 'Motion is paused because your system prefers reduced motion. One composed frame is shown.';
+    syncPauseBtn();
+    renderStill(STILL_T);
+  } else {
+    startEpoch = performance.now();
+    tick();
+  }
+}
+
+function currentPreset() {
+  const el = document.querySelector('.controls .tab[aria-pressed="true"]');
+  return el ? el.dataset.preset : 'headline';
+}
+
+async function setPreset(name) {
+  const p = PRESETS[name];
+  // Show the exact same HTML as live DOM next to the canvas.
+  document.getElementById('fireSource').innerHTML =
+    document.getElementById('dripSource').innerHTML = p.html;
+  await Promise.all([fire.setSource(p.html, p.w, p.h), drip.setSource(p.html, p.w, p.h)]);
+  if (paused) renderStill(currentT());
+}
+
+function currentT() {
+  return paused ? (window.__stillT || STILL_T) : (performance.now() - startEpoch) / 1000;
+}
+
+function renderStill(t) {
+  window.__stillT = t;
+  fire.draw(t);
+  drip.draw(t);
+}
+
+function tick() {
+  if (paused) return;
+  const t = (performance.now() - startEpoch) / 1000;
+  fire.draw(t);
+  drip.draw(t);
+  rafId = requestAnimationFrame(tick);
+}
+
+function togglePause() {
+  paused = !paused;
+  syncPauseBtn();
+  if (paused) {
+    cancelAnimationFrame(rafId);
+    renderStill(currentT());
+    document.getElementById('motionNote').textContent = 'Paused. One composed frame is shown.';
+  } else {
+    document.getElementById('motionNote').textContent = '';
+    startEpoch = performance.now() - (window.__stillT || 0) * 1000;
+    tick();
+  }
+}
+
+function syncPauseBtn() {
+  const b = document.getElementById('pauseBtn');
+  b.setAttribute('aria-pressed', String(paused));
+  b.textContent = paused ? 'Resume motion' : 'Pause motion';
+}
+
+boot().catch(e => {
+  document.querySelector('.demos').insertAdjacentHTML('afterbegin',
+    '<p class="gl-fallback">Could not start the demos: ' + String(e.message || e) + '</p>');
+});
+</script>
+</body>
+</html>
