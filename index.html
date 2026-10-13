@@ -136,9 +136,9 @@
   </header>
 
   <div class="controls" role="group" aria-label="Source element presets">
-    <button class="tab" data-preset="headline" aria-pressed="true">Headline</button>
+    <button class="tab" data-preset="orb" aria-pressed="true">Orb</button>
+    <button class="tab" data-preset="word" aria-pressed="false">Word</button>
     <button class="tab" data-preset="button" aria-pressed="false">Button</button>
-    <button class="tab" data-preset="card" aria-pressed="false">Card</button>
     <span class="spacer"></span>
     <button class="pause" id="pauseBtn" aria-pressed="false">Pause motion</button>
   </div>
@@ -299,6 +299,15 @@ void main() {
   float depth = clamp((tip - uv.y) / 0.55, 0.0, 1.0);   // 0 at tip, 1 deep
   float body = smoothstep(0.0, 0.10, depth);            // soft tip edge
 
+  // Flame columns rise from the element itself: look straight down
+  // for element alpha, so a small centered element gets a column
+  // of flame instead of a full-width wall.
+  float colEl = 0.0;
+  for (float k = 0.0; k < 5.0; k++)
+    colEl = max(colEl, sampleElement(vec2(uv.x, uv.y - k * 0.10)).a);
+  float colMask = smoothstep(0.0, 0.35, colEl);
+  body *= colMask;
+
   float detail = fbm(vec2(uv.x * 16.0, uv.y * 11.0 - t * 3.2));
   float heat = clamp(depth * (0.5 + f) * (0.6 + 0.8 * detail), 0.0, 1.0);
   heat *= 0.85 + 0.15 * sin(t * 12.0 + uv.x * 22.0 + f * 4.0);  // flicker
@@ -326,7 +335,7 @@ void main() {
   vec2 sp = vec2(uv.x * 28.0, uv.y * 12.0 - t * 2.6);
   vec2 cell = floor(sp), fr = fract(sp);
   float h = hash(cell);
-  if (h > 0.94 && uv.y < tip) {
+  if (h > 0.94 && uv.y < tip && colMask > 0.01) {
     vec2 spos = vec2(hash(cell + 1.7), fract(hash(cell + 3.1) + t * (0.3 + h)));
     vec2 dxy = fr - spos;
     dxy.x *= (u_res.x / u_res.y) * (12.0 / 28.0);   // round dots on screen
@@ -411,21 +420,20 @@ void main() {
 /* ---------------- presets: one HTML string, inline styles only ---------------- */
 const FONT = "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;";
 const PRESETS = {
-  headline: {
-    w: 560, h: 150,
-    html: '<div xmlns="http://www.w3.org/1999/xhtml" style="width:560px;height:150px;display:flex;align-items:center;justify-content:center;background:#7c3aed;">' +
-      '<span style="' + FONT + 'font-size:62px;font-weight:800;color:#ffffff;letter-spacing:-1px;">Hello, shaders</span></div>'
+  orb: {
+    w: 320, h: 320,
+    html: '<div xmlns="http://www.w3.org/1999/xhtml" style="width:320px;height:320px;display:flex;align-items:center;justify-content:center;">' +
+      '<div style="width:250px;height:250px;background:#7c3aed;border-radius:50%;"></div></div>'
+  },
+  word: {
+    w: 560, h: 220,
+    html: '<div xmlns="http://www.w3.org/1999/xhtml" style="width:560px;height:220px;display:flex;align-items:center;justify-content:center;">' +
+      '<span style="' + FONT + 'font-size:150px;font-weight:800;color:#8b5cf6;letter-spacing:-4px;">FRAG</span></div>'
   },
   button: {
     w: 560, h: 190,
     html: '<div xmlns="http://www.w3.org/1999/xhtml" style="width:560px;height:190px;display:flex;align-items:center;justify-content:center;">' +
       '<span style="' + FONT + 'display:inline-block;font-size:28px;font-weight:700;color:#ffffff;background:#7c3aed;padding:22px 52px;">Get started</span></div>'
-  },
-  card: {
-    w: 430, h: 250,
-    html: '<div xmlns="http://www.w3.org/1999/xhtml" style="width:430px;height:250px;background:#17171e;border:1px solid #3a3a44;padding:30px;box-sizing:border-box;">' +
-      '<div style="' + FONT + 'font-size:27px;font-weight:700;color:#f2f1f6;margin-bottom:12px;">Project Apollo</div>' +
-      '<div style="' + FONT + 'font-size:16px;line-height:1.55;color:#a7a7b3;">A small card with a title and two lines of body copy, rendered first as plain DOM, then chewed on by a fragment shader.</div></div>'
   }
 };
 
@@ -553,7 +561,7 @@ async function boot() {
   }
   document.getElementById('fireSrc').textContent = FRAG_FIRE.trim();
   document.getElementById('dripSrc').textContent = FRAG_DRIP.trim();
-  await setPreset(OG_MODE ? 'headline' : currentPreset());
+  await setPreset(OG_MODE ? 'word' : currentPreset());
 
   document.querySelectorAll('.controls .tab').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -582,7 +590,7 @@ async function boot() {
 
 function currentPreset() {
   const el = document.querySelector('.controls .tab[aria-pressed="true"]');
-  return el ? el.dataset.preset : 'headline';
+  return el ? el.dataset.preset : 'orb';
 }
 
 async function setPreset(name) {
